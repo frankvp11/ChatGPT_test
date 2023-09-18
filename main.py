@@ -4,7 +4,6 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.lang import Builder
-from kivy.graphics.texture import Texture
 from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
@@ -26,28 +25,54 @@ kv_string = ('''
             text: "Capture Image"
             on_press: root.capture_image()
 ''')
+             
+
 Builder.load_string(kv_string)
+
 
 class CameraApp(BoxLayout):
     def toggle_camera(self):
         if self.ids.camera.play:
-            self.ids.camera.connect_camera()
+            self.ids.camera.connect_camera(filepath_callback=self.temp)
             self.ids.camera.play = False
         else:
             self.ids.camera.disconnect_camera()
             self.ids.camera.play = True
 
-    def capture_image(self):
-        # Capture the image from the camera
-        self.ids.camera.export_to_png("temp.jpg")
+    def temp(self, file_path):
+        print(file_path)
         self.ids.camera.disconnect_camera()
         self.ids.camera.clear_widgets()
-        self.ids.camera.add_widget(Image(source="temp.jpg"))
+        self.ids.camera.add_widget(Image(source=file_path))
+    def capture_image(self):
+        # Capture the image from the camera
+        self.ids.camera.capture_photo()
+        # self.ids.camera.export_to_png("temp.jpg")
+
     
 
 
 class MyApp(App):
+
+    def request_android_permissions(self):
+        from android.permissions import request_permissions, Permission
+
+        def callback(permissions, results):
+            if all([res for res in results]):
+                print("callback. All permissions granted.")
+            else:
+                print("callback. Some permissions refused.")
+
+        request_permissions([Permission.CAMERA,
+                             Permission.RECORD_AUDIO,
+                             Permission.WRITE_EXTERNAL_STORAGE], callback)
+
+
+
     def build(self):
+        if platform == "android":
+            print("gps.py: Android detected. Requesting permissions")
+            self.request_android_permissions()
         return CameraApp()
 
 if __name__ == '__main__':
