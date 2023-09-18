@@ -52,10 +52,11 @@ class CameraApp(BoxLayout):
 
     def capture_image(self):
         # Capture the image from the camera
-        self.ids.camera.export_to_png("temp.jpg")
+        image = self.ids.camera.export_as_image()
+        image.texture.flip_vertical()
         self.ids.camera.disconnect_camera()
         self.ids.camera.clear_widgets()
-        self.ids.camera.add_widget(Image(source="temp.jpg"))
+        self.ids.camera.add_widget(Image(texture=image.texture))
     
 
 
