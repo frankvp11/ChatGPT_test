@@ -9,6 +9,9 @@ from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
 
+if platform == 'android':
+    from android.permissions import request_permissions, Permission
+
 kv_string = ('''
 <CameraApp>:
     orientation: 'vertical'
@@ -30,6 +33,16 @@ Builder.load_string(kv_string)
 
 class CameraApp(BoxLayout):
     def toggle_camera(self):
+        if platform == 'android':
+            def android_callback(permissions, status):
+                if all(status):
+                    self.camera_toggle()
+                    print('passed permission checks')
+            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE], android_callback)
+        else:
+            self.camera_toggle()
+
+    def camera_toggle(self):
         if self.ids.camera.play:
             self.ids.camera.connect_camera()
             self.ids.camera.play = False
