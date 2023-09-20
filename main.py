@@ -4,7 +4,6 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.lang import Builder
-from kivy.graphics.texture import Texture
 from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
@@ -29,7 +28,10 @@ kv_string = ('''
             text: "Capture Image"
             on_press: root.capture_image()
 ''')
+             
+
 Builder.load_string(kv_string)
+
 
 class CameraApp(BoxLayout):
     def toggle_camera(self):
@@ -44,7 +46,7 @@ class CameraApp(BoxLayout):
 
     def camera_toggle(self):
         if self.ids.camera.play:
-            self.ids.camera.connect_camera()
+            self.ids.camera.connect_camera(filepath_callback=self.temp)
             self.ids.camera.play = False
         else:
             self.ids.camera.disconnect_camera()
@@ -61,7 +63,26 @@ class CameraApp(BoxLayout):
 
 
 class MyApp(App):
+
+    def request_android_permissions(self):
+        from android.permissions import request_permissions, Permission
+
+        def callback(permissions, results):
+            if all([res for res in results]):
+                print("callback. All permissions granted.")
+            else:
+                print("callback. Some permissions refused.")
+
+        request_permissions([Permission.CAMERA,
+                             Permission.RECORD_AUDIO,
+                             Permission.WRITE_EXTERNAL_STORAGE], callback)
+
+
+
     def build(self):
+        if platform == "android":
+            print("gps.py: Android detected. Requesting permissions")
+            self.request_android_permissions()
         return CameraApp()
 
 if __name__ == '__main__':
