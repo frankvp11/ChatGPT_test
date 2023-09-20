@@ -4,19 +4,20 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.lang import Builder
+from kivy.graphics.texture import Texture
 from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
-
+#
 kv_string = ('''
 <CameraApp>:
     orientation: 'vertical'
     Preview:
         id: camera
-        play: False
+        play: True
         resolution: (640, 480)
         size_hint_y: 0.9
     BoxLayout:
@@ -28,10 +29,7 @@ kv_string = ('''
             text: "Capture Image"
             on_press: root.capture_image()
 ''')
-             
-
 Builder.load_string(kv_string)
-
 
 class CameraApp(BoxLayout):
     def toggle_camera(self):
@@ -40,13 +38,13 @@ class CameraApp(BoxLayout):
                 if all(status):
                     self.camera_toggle()
                     print('passed permission checks')
-            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE], android_callback)
+            request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE, Permission.INTERNET, Permission.RECORD_AUDIO], android_callback)
         else:
             self.camera_toggle()
 
     def camera_toggle(self):
         if self.ids.camera.play:
-            self.ids.camera.connect_camera(filepath_callback=self.temp)
+            self.ids.camera.connect_camera(data_format="rgba", enable_video=False)
             self.ids.camera.play = False
         else:
             self.ids.camera.disconnect_camera()
@@ -63,26 +61,7 @@ class CameraApp(BoxLayout):
 
 
 class MyApp(App):
-
-    def request_android_permissions(self):
-        from android.permissions import request_permissions, Permission
-
-        def callback(permissions, results):
-            if all([res for res in results]):
-                print("callback. All permissions granted.")
-            else:
-                print("callback. Some permissions refused.")
-
-        request_permissions([Permission.CAMERA,
-                             Permission.RECORD_AUDIO,
-                             Permission.WRITE_EXTERNAL_STORAGE], callback)
-
-
-
     def build(self):
-        if platform == "android":
-            print("gps.py: Android detected. Requesting permissions")
-            self.request_android_permissions()
         return CameraApp()
 
 if __name__ == '__main__':
