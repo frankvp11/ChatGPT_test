@@ -143,20 +143,23 @@ class CameraApp(BoxLayout):
         image_data = image_data.reshape(kivy_image.texture.size[1], kivy_image.texture.size[0], 4)
 
         # Convert from RGBA to BGR
-        opencv_image = cv2.cvtColor(image_data, cv2.COLOR_RGBA2BGR)
-        
-        return opencv_image
+        opencv_image = cv2.cvtColor(image_data, cv2.COLOR_RGBA2GRAY) # COLOR_RGBA2BGR
+        _, thresh = cv2.threshold(opencv_image, 90, 255, cv2.THRESH_BINARY)
+        thresh = cv2.bitwise_not(thresh)
+        binary_bgr_image = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+
+        return binary_bgr_image
 
     def solve(self):
         # self.model = YOLO("yolov8n.pt")
-        self.model = YOLO("best.pt")
+        self.model = YOLO("best2.pt")
         new_image =  self.kivy_to_opencv(self.image)
         # new_image = cv2.flip(new_image, -1)  # The '-1' denotes both horizontal and vertical flipping
         # new_image = cv2.flip(new_image, 0)
         new_image = cv2.flip(new_image, 0)
 
         # newvalue = newvalue.reshape(height, width, 4)
-        results = self.model.predict(new_image, conf=0.1)
+        results = self.model.predict(new_image, conf=0.4)
         for result in results:
             
             for (x0, y0, x1, y1), (cls) in zip(result.boxes.xyxy, result.boxes.cls):
@@ -173,7 +176,7 @@ class CameraApp(BoxLayout):
         try:
             sorted_boxes = (self.sort_bboxes(list_of_coords))
 
-            matrix = self.form_matrix(sorted_boxes)
+            matrix = self.form_matrix(sorted_boxes, 3, 4)
         except:
             #print("oh well!")
             matrix = ["hi"]
@@ -196,7 +199,7 @@ class CameraApp(BoxLayout):
         # Capture the image from the camera
         self.image = self.ids.camera.export_as_image()
         self.image.texture.flip_vertical()
-        # self.image.texture.flip_horizontal()
+        self.image.texture.flip_horizontal()
         self.ids.camera.disconnect_camera()
         self.ids.camera.clear_widgets()
         self.ids.camera.add_widget(Image(texture=self.image.texture))

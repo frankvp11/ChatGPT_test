@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, ultralytics==8.0.184, opencv-python==4.8.0.76
+requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, ultralytics==8.0.184, opencv, matplotlib, torch
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
