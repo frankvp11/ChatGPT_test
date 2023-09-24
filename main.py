@@ -18,6 +18,15 @@ import cv2
 if platform == 'android':
     from android.permissions import request_permissions, Permission
 #
+
+
+'''
+        size_hint_y: 0.2
+        TextInput:
+            text: "Rows:"
+        TextInput:
+            text: "Columns:"
+'''
 kv_string = ('''
 <CameraApp>:
     orientation: 'vertical'
@@ -25,7 +34,16 @@ kv_string = ('''
         id: camera
         play: True
         resolution: (640, 480)
-        size_hint_y: 0.8
+        size_hint_y: 0.6
+    BoxLayout:
+        size_hint_y: 0.2
+        DropDown:
+            Button: 
+                text: "RREF"
+                on_press: root.select("item1")
+            Button:
+                text: "REF"
+                on_press: root.select("item2")
     BoxLayout:
         size_hint_y: 0.2
         Button:
@@ -72,8 +90,6 @@ class CameraApp(BoxLayout):
         for i in range(len(bboxes)):
             row.append(bboxes[i])
 
-            # If it's the last bbox or the y-gap to the next bbox is larger than avg_height / 2
-            # consider the next bbox as part of the next row
             if i == len(bboxes) - 1 or bboxes[i+1][1] - bboxes[i][3] > avg_height / 2:
                 row = sorted(row, key=lambda x: x[0])  # sort the row based on x
                 sorted_bboxes.extend(row)
@@ -151,11 +167,10 @@ class CameraApp(BoxLayout):
         return binary_bgr_image
 
     def solve(self):
-        # self.model = YOLO("yolov8n.pt")
         self.model = YOLO("best2.pt")
         new_image =  self.kivy_to_opencv(self.image)
-        # new_image = cv2.flip(new_image, -1)  # The '-1' denotes both horizontal and vertical flipping
-        # new_image = cv2.flip(new_image, 0)
+        new_image = cv2.flip(new_image, -1)  # The '-1' denotes both horizontal and vertical flipping
+        
         new_image = cv2.flip(new_image, 0)
 
         # newvalue = newvalue.reshape(height, width, 4)
@@ -179,21 +194,19 @@ class CameraApp(BoxLayout):
             matrix = self.form_matrix(sorted_boxes, 3, 4)
         except:
             #print("oh well!")
-            matrix = ["hi"]
+            matrix = [[1,2,3], [4,5,6], [7,8,9]]
         self.ids.camera.clear_widgets()
-        #print(matrix)
-        self.ids.camera.add_widget(
-            Label(text=str(matrix))
-        )
-## (210, 36), (253, 124) -> 1
-## (333, 38), (448, 138) -> 2
-## (499, 38), (570, 123) -> 3
-## (210, 172), (253, 275) -> 4
-## (333, 172), (448, 275) -> 5
-## (499, 172), (570, 275) -> 6
-## (210, 289), (253, 388) -> 7
-## (333, 289), (448, 388) -> 8
-## (499, 289), (570, 388) -> 9
+
+        size_x = 1 / len(matrix)
+        size_y=  1 / len(matrix[0])
+        for i in range(len(matrix)):
+            for j in range(len(matrix[i])):
+                self.ids.camera.add_widget(
+                    Label(text=str(matrix[i][j]), pos_hint=(200, 200), size_hint=(size_x, size_y))
+                )
+                print("added widget!")
+
+
 
     def capture_image(self):
         # Capture the image from the camera
