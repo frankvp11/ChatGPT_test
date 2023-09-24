@@ -1,6 +1,7 @@
 # main.py
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
@@ -10,7 +11,7 @@ from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
 from kivy.uix.textinput import TextInput
-
+import sympy
 
 #new imports
 from ultralytics import YOLO
@@ -18,37 +19,68 @@ import cv2
 
 if platform == 'android':
     from android.permissions import request_permissions, Permission
-#
+
+
+
 
 
 
 kv_string = ('''
 <CameraApp>:
     orientation: 'vertical'
+
     Preview:
         id: camera
         play: True
         resolution: (640, 480)
         size_hint_y: 0.6
-    BoxLayout:
-        size_hint_y: 0.2
-        TextInput:
-            text: "Rows:"
-        TextInput:
-            text: "Columns:"
 
-        DropDown:
-            Button: 
-                text: "RREF"
-                on_press: root.select("item1")
-            Button:
-                text: "REF"
-                on_press: root.select("item2")
-             
     BoxLayout:
-        size_hint_y: 0.2
+        orientation: 'horizontal'
+        size_hint_y: 0.1
         Button:
-            text: "Solve"
+            text: "Compute Solution"
+            on_press: root.handle_solve(main_button.text)
+            size_hint_x: 0.5
+        Button:
+            id: main_button
+            text: 'Click for Dropdown'
+            on_release: dropdown.open(self)
+            size_hint_x: 0.5
+        DropDown:
+            id: dropdown
+            size_hint_y: None
+            height: 0  # Start with 0 height so it doesn't show
+
+            Button:
+                text: 'Reduced Row Echelon Form'
+                size_hint_y: None
+                height: 44
+                on_release: 
+                    root.ids.main_button.text = self.text
+                    dropdown.select(self.text)
+                    dropdown.height = 0  # Collapse dropdown after selecting
+            Button:
+                text: 'To be determined'
+                size_hint_y: None
+                height: 44
+                on_release: 
+                    root.ids.main_button.text = self.text
+                    dropdown.select(self.text)
+                    dropdown.height = 0  # Collapse dropdown after selecting
+            Button:
+                text: 'To be determined'
+                size_hint_y: None
+                height: 44
+                on_release: 
+                    root.ids.main_button.text = self.text
+                    dropdown.select(self.text)
+                    dropdown.height = 0  # Collapse dropdown after selecting
+
+    BoxLayout:
+        size_hint_y: 0.1
+        Button:
+            text: "Extract Matrix"
             on_press: root.solve()
         Button:
             text: "Toggle Camera"
@@ -56,7 +88,14 @@ kv_string = ('''
         Button:
             text: "Capture Image"
             on_press: root.capture_image()
+
 ''')
+
+
+
+
+
+
 Builder.load_string(kv_string)
 
 class CameraApp(BoxLayout):
@@ -99,91 +138,120 @@ class CameraApp(BoxLayout):
         return sorted_bboxes    
 
     def form_matrix(self, bboxes, N=3, M=3):
-        # Sort by y value
-        bboxes = sorted(bboxes, key=lambda x: x[1])
-        avg_height = sum([box[3] - box[1] for box in bboxes]) / len(bboxes)
-        avg_width=  sum([box[2] - box[0] for box in bboxes]) / len(bboxes)
-        #debugging
-        print(f"Average height {avg_height}, width {avg_width}")
-        # Group into rows. Basically, if it's y coordinate is too big a gap between the previous, it will consider it a new row.
-        rows = []
-        row = [bboxes[0]]
-        for i in range(1, len(bboxes)):
-            if bboxes[i][1] > row[-1][1]+(avg_height * 0.75):  # adjustable factor
-                rows.append(row)
-                row = []
-            row.append(bboxes[i])
-        rows.append(row)  # Add the last row
-        print(f" Rows {rows}")
-        # rows = rows[:1]
-        # Group within rows for multi-digit numbers.
-        def group_bboxes(row, M):
-            row = sorted(row, key=lambda x: x[0])
-            numbers = []
+        # Sort by y value to group by rows
+        def group_by_rows(bboxes):
+            bboxes = sorted(bboxes, key=lambda x: x[1])
+            avg_height = sum([box[3] - box[1] for box in bboxes]) / len(bboxes)
 
-            while len(row) > M:
-                # Calculate horizontal gaps between adjacent bounding boxes
-                gaps = [(row[i+1][0] - row[i][2], i) for i in range(len(row)-1)]
-                # Find the smallest gap
-                smallest_gap = min(gaps, key=lambda x: x[0])
+            # Group into rows
+            rows = []
+            row = [bboxes[0]]
+            for i in range(1, len(bboxes)):
+                if bboxes[i][1] > row[-1][1] + (avg_height * 0.5):  # adjustable factor
+                    rows.append(sorted(row, key=lambda x : x[0]))
+                    row = []
+                row.append(bboxes[i])
+            rows.append(sorted(row, key=lambda x : x[0]))  # Add the last row
+            return rows
 
-                # Merge bounding boxes that have the smallest gap
-                idx_to_merge = smallest_gap[1]
-                merged_bbox = [
-                    row[idx_to_merge][0],
-                    row[idx_to_merge][1],
-                    row[idx_to_merge+1][2],
-                    max(row[idx_to_merge][3], row[idx_to_merge+1][3]),
-                    float(str(int(row[idx_to_merge][4])) + str(int(row[idx_to_merge+1][4])))
-                ]
+        # Group each row into columns using x-coordinates
+        def group_by_columns(bboxes):
+            bboxes_sorted = sorted(bboxes, key=lambda x: x[0])
+            avg_width = sum([box[2] - box[0] for box in bboxes_sorted]) / len(bboxes_sorted)
 
-                # Replace the original bounding boxes with the merged one
-                row = row[:idx_to_merge] + [merged_bbox] + row[idx_to_merge+2:]
+            cols = []
+            col = [bboxes_sorted[0]]
+            temp = [box[-1] for box in bboxes_sorted]
+            for i in range(1, len(bboxes_sorted)):
+                # Calculate the gap between the current bounding box and the previous one
+                gap =  bboxes_sorted[i][0] -col[-1][0] 
+                # If the gap is larger than half the average width, create a new column
+                if abs(gap) > (avg_width * 0.5):  # adjustable factor
 
-            for bbox in row:
-                numbers.append(str(int(bbox[4])))
+                    cols.append(sorted(col, key=lambda x : x[1]))
+                    col = []
+                
+                col.append(bboxes_sorted[i])
 
-            return numbers
+            # Append the last column
+            if col:
+                cols.append(sorted(col, key=lambda x : x[1]))
 
-        matrix = []
+            return cols
+
+        rows = group_by_rows(bboxes)
+        new_rows =[]
         for row in rows:
-            matrix.append(group_bboxes(row, M))
+            new_rows.append([i[-1] for i in row])
+        rows = new_rows
+        print(f"Rows {new_rows}")
+        cols = group_by_columns(bboxes)
+        new_cols = []
+        for col in cols:
+            new_cols.append([i[-1] for i in col])
+        cols = new_cols
+        print(f"Columns {cols}")
+
+        def merge_matrices(rows_matrix, cols_matrix):
+            # Calculate dimensions
+            num_rows = len(rows_matrix)
+
+            num_cols = max(max(len(row) for row in rows_matrix), max(len(col) for col in cols_matrix))
+
+            merged_matrix = []
+
+            # Iterate over each cell by row and column
+            for i in range(num_rows):
+                row = []
+                for j in range(num_cols):
+                    if len(rows_matrix) > i and len(rows_matrix[i]) > j:
+                        row_value = rows_matrix[i][j]
+                    else:
+                        row_value = ""
+
+                    if len(cols_matrix) > j and len(cols_matrix[j]) > i:
+                        col_value = cols_matrix[j][i]
+                    else:
+                        col_value = ""
+
+                    # Choose value from either rows_matrix or cols_matrix. If both have a value, they should match
+                    if row_value and col_value and row_value != col_value:
+                        print(f"Conflicting values at {i}, {j}: {row_value} vs. {col_value}")
+                        row.append(" ")
+                    else:
+                        value = row_value or col_value
+                        row.append(value)
+                merged_matrix.append(row)
+
+            return merged_matrix
+        return merge_matrices(rows, cols)
 
 
-        return matrix
   
     def kivy_to_opencv(self, kivy_image):
-        # Extract pixel data from Kivy Image's texture
         image_data = np.frombuffer(kivy_image.texture.pixels, dtype=np.uint8)
-
-        # Reshape the data
         image_data = image_data.reshape(kivy_image.texture.size[1], kivy_image.texture.size[0], 4)
-
-        # Convert from RGBA to BGR
         opencv_image = cv2.cvtColor(image_data, cv2.COLOR_RGBA2GRAY) # COLOR_RGBA2BGR
-        _, thresh = cv2.threshold(opencv_image, 90, 255, cv2.THRESH_BINARY)
-        thresh = cv2.bitwise_not(thresh)
+        img_blurred = cv2.GaussianBlur(opencv_image, (5, 5), 0)
+        img_threshold = cv2.adaptiveThreshold(
+            img_blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+        thresh = cv2.bitwise_not(img_threshold)
         binary_bgr_image = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-
         return binary_bgr_image
 
     def solve(self):
-        self.model = YOLO("best2.pt")
+        self.model = YOLO("best_float32.tflite")
         new_image =  self.kivy_to_opencv(self.image)
-        new_image = cv2.flip(new_image, -1)  # The '-1' denotes both horizontal and vertical flipping
+        new_image = cv2.flip(new_image, -1)  #
         
         new_image = cv2.flip(new_image, 0)
-
-        # newvalue = newvalue.reshape(height, width, 4)
         results = self.model.predict(new_image, conf=0.4)
         for result in results:
             
             for (x0, y0, x1, y1), (cls) in zip(result.boxes.xyxy, result.boxes.cls):
-                # print(cls.item())
                 cv2.rectangle(new_image, (int(x0), int(y0)), (int(x1), int(y1)), color=(0,255,0), thickness=2)
                 cv2.putText(new_image, str(cls.item()), (int(x0), int(y0)-5), fontFace = cv2.FONT_ITALIC, fontScale = 0.6, color = (0, 255, 0), thickness=2)
-
-        # cv2.imshow("image", new_image)
 
         list_of_coords =[ ]
         for box in results:
@@ -192,21 +260,53 @@ class CameraApp(BoxLayout):
         try:
             sorted_boxes = (self.sort_bboxes(list_of_coords))
 
-            matrix = self.form_matrix(sorted_boxes, 3, 4)
+            matrix = self.form_matrix(sorted_boxes, 4, 3)
         except:
-            #print("oh well!")
             matrix = [[1,2,3], [4,5,6], [7,8,9]]
+        print("Actual matrix:")
+        for row in matrix:
+            print(row)
+        # cv2.imshow("image", new_image)
         self.ids.camera.clear_widgets()
+        self.grid_layout = GridLayout(cols=len(matrix[0]), size_hint=(0.5, 0.5))
 
-        size_x = 1 / len(matrix)
-        size_y=  1 / len(matrix[0])
         for i in range(len(matrix)):
             for j in range(len(matrix[i])):
-                self.ids.camera.add_widget(
-                    TextInput(text=str(matrix[i][j]), pos_hint=(200, 200), size_hint=(size_x, size_y))
-                )
-                print("added widget!")
+                self.grid_layout.add_widget(TextInput(text=str(matrix[i][j]), size_hint=(0.5, 0.5)))
 
+        self.ids.camera.add_widget(self.grid_layout)
+
+    def get_matrix_from_input(self, grid_layout):
+        """Get the matrix values from the grid of TextInput widgets."""
+        matrix = []
+        row = []
+        for i, child in enumerate(grid_layout.children):
+            row.append(float(child.text))
+            if (i + 1) % grid_layout.cols == 0:  
+                matrix.append(row)
+                row = []
+        matrix.reverse()  
+        for m in matrix:
+            m.reverse()
+        return matrix
+    
+
+    def reduced_row_echelon_form(self, matrix):
+        m = sympy.Matrix(matrix)
+        return m.rref()
+
+
+    def handle_solve(self, option):
+        abbrev = ''.join([word[0] for word in option.split()]).lower()
+
+        if (abbrev == "rref"):
+            matrix = self.get_matrix_from_input(self.grid_layout)
+            matrix = self.reduced_row_echelon_form(matrix)[0].tolist()
+            self.grid_layout.clear_widgets()
+            for i in range(len(matrix)):
+                for j in range(len(matrix[i])):
+                    answer = round(matrix[i][j])
+                    self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
 
 
     def capture_image(self):

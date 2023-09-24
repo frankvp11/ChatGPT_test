@@ -13,7 +13,7 @@ package.domain = org.example
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas
+source.include_exts = py,png,jpg,kv,atlas, tflite
 
 # (list) List of inclusions using pattern matching
 #source.include_patterns = assets/*,images/*.png
@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, ultralytics==8.0.184, opencv, matplotlib, torch
+requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, ultralytics==8.0.184, opencv,  tflite-runtime
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
