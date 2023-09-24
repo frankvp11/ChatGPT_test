@@ -9,6 +9,7 @@ from kivy.graphics.texture import Texture
 from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
+from kivy.uix.textinput import TextInput
 
 
 #new imports
@@ -20,13 +21,7 @@ if platform == 'android':
 #
 
 
-'''
-        size_hint_y: 0.2
-        TextInput:
-            text: "Rows:"
-        TextInput:
-            text: "Columns:"
-'''
+
 kv_string = ('''
 <CameraApp>:
     orientation: 'vertical'
@@ -37,6 +32,11 @@ kv_string = ('''
         size_hint_y: 0.6
     BoxLayout:
         size_hint_y: 0.2
+        TextInput:
+            text: "Rows:"
+        TextInput:
+            text: "Columns:"
+
         DropDown:
             Button: 
                 text: "RREF"
@@ -44,6 +44,7 @@ kv_string = ('''
             Button:
                 text: "REF"
                 on_press: root.select("item2")
+             
     BoxLayout:
         size_hint_y: 0.2
         Button:
@@ -202,7 +203,7 @@ class CameraApp(BoxLayout):
         for i in range(len(matrix)):
             for j in range(len(matrix[i])):
                 self.ids.camera.add_widget(
-                    Label(text=str(matrix[i][j]), pos_hint=(200, 200), size_hint=(size_x, size_y))
+                    TextInput(text=str(matrix[i][j]), pos_hint=(200, 200), size_hint=(size_x, size_y))
                 )
                 print("added widget!")
 
