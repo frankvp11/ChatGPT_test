@@ -11,7 +11,7 @@ from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
 from kivy.uix.textinput import TextInput
-import sympy
+# import sympy
 
 #new imports
 from ultralytics import YOLO
@@ -20,7 +20,10 @@ import cv2
 if platform == 'android':
     from android.permissions import request_permissions, Permission
 
-
+        # Button:
+        #     text: "Compute Solution"
+        #     on_press: root.handle_solve(main_button.text)
+        #     size_hint_x: 0.5
 
 
 
@@ -38,10 +41,7 @@ kv_string = ('''
     BoxLayout:
         orientation: 'horizontal'
         size_hint_y: 0.1
-        Button:
-            text: "Compute Solution"
-            on_press: root.handle_solve(main_button.text)
-            size_hint_x: 0.5
+
         Button:
             id: main_button
             text: 'Click for Dropdown'
@@ -291,22 +291,22 @@ class CameraApp(BoxLayout):
         return matrix
     
 
-    def reduced_row_echelon_form(self, matrix):
-        m = sympy.Matrix(matrix)
-        return m.rref()
+    # def reduced_row_echelon_form(self, matrix):
+    #     m = sympy.Matrix(matrix)
+    #     return m.rref()
 
 
-    def handle_solve(self, option):
-        abbrev = ''.join([word[0] for word in option.split()]).lower()
+    # def handle_solve(self, option):
+    #     abbrev = ''.join([word[0] for word in option.split()]).lower()
 
-        if (abbrev == "rref"):
-            matrix = self.get_matrix_from_input(self.grid_layout)
-            matrix = self.reduced_row_echelon_form(matrix)[0].tolist()
-            self.grid_layout.clear_widgets()
-            for i in range(len(matrix)):
-                for j in range(len(matrix[i])):
-                    answer = round(matrix[i][j])
-                    self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
+    #     if (abbrev == "rref"):
+    #         matrix = self.get_matrix_from_input(self.grid_layout)
+    #         matrix = self.reduced_row_echelon_form(matrix)[0].tolist()
+    #         self.grid_layout.clear_widgets()
+    #         for i in range(len(matrix)):
+    #             for j in range(len(matrix[i])):
+    #                 answer = round(matrix[i][j])
+    #                 self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
 
 
     def capture_image(self):
