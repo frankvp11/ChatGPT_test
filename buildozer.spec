@@ -1,10 +1,10 @@
 [app]
 
 # (str) Title of your application
-title = camera_testing
+title = camera_testing_2
 
 # (str) Package name
-package.name = camera_testing_1
+package.name = camera_testing_2
 
 # (str) Package domain (needed for android/ios packaging)
 package.domain = org.example
@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, ultralytics==8.0.184, opencv  tflite-runtime, matplotlib
+requirements = python3,kivy,camera4kivy,gestures4kivy,numpy, requests, opencv  
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes

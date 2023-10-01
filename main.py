@@ -12,9 +12,9 @@ import numpy as np
 from kivy.utils import platform
 from kivy.uix.textinput import TextInput
 # import sympy
-
+import requests
 #new imports
-from ultralytics import YOLO
+# from ultralytics import YOLO
 import cv2
 
 if platform == 'android':
@@ -241,32 +241,34 @@ class CameraApp(BoxLayout):
         return binary_bgr_image
 
     def solve(self):
-        self.model = YOLO("best_float32.tflite")
+        # self.model = YOLO("best_float32.tflite")
         new_image =  self.kivy_to_opencv(self.image)
         new_image = cv2.flip(new_image, -1)  #
         
         new_image = cv2.flip(new_image, 0)
-        results = self.model.predict(new_image, conf=0.4)
-        for result in results:
-            
-            for (x0, y0, x1, y1), (cls) in zip(result.boxes.xyxy, result.boxes.cls):
-                cv2.rectangle(new_image, (int(x0), int(y0)), (int(x1), int(y1)), color=(0,255,0), thickness=2)
-                cv2.putText(new_image, str(cls.item()), (int(x0), int(y0)-5), fontFace = cv2.FONT_ITALIC, fontScale = 0.6, color = (0, 255, 0), thickness=2)
+        is_success, image_buf = cv2.imencode(".jpg", new_image)
+        if not is_success:
+            print("Failed to encode image")
+            return
 
-        list_of_coords =[ ]
-        for box in results:
-            for (x0, y0, x1, y1), (cls) in zip(box.boxes.xyxy, box.boxes.cls):
-                list_of_coords.append([x0.item(), y0.item(), x1.item(), y1.item(), cls.item()])
+        # Use the requests library to send the image
+        files = {'file': ("image2.jpg", image_buf.tobytes(), 'image/jpg')}
         try:
-            sorted_boxes = (self.sort_bboxes(list_of_coords))
+            API_ENDPOINT = "http://127.0.0.1:8000/predict/"
+            response = requests.post(API_ENDPOINT, files=files)
+            if response.status_code == 200:
+                print(response.json())
+                matrix = response.json()['predictions']
+            else:
+                print(f"Failed with status code: {response.status_code}, response: {response.text}")
+                matrix = [[1,2, 3]]
+        except Exception as e:
+            print(f"Exception occurred: {str(e)}")
 
-            matrix = self.form_matrix(sorted_boxes, 4, 3)
-        except:
-            matrix = [[1,2,3], [4,5,6], [7,8,9]]
-        print("Actual matrix:")
-        for row in matrix:
-            print(row)
-        # cv2.imshow("image", new_image)
+
+
+
+
         self.ids.camera.clear_widgets()
         self.grid_layout = GridLayout(cols=len(matrix[0]), size_hint=(0.5, 0.5))
 
