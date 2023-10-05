@@ -11,19 +11,22 @@ from camera4kivy import Preview
 import numpy as np
 from kivy.utils import platform
 from kivy.uix.textinput import TextInput
+from numpy import *
+from solver import Solver
+
 # import sympy
+
 import requests
 #new imports
 # from ultralytics import YOLO
 import cv2
 
+
+
 if platform == 'android':
     from android.permissions import request_permissions, Permission
 
-        # Button:
-        #     text: "Compute Solution"
-        #     on_press: root.handle_solve(main_button.text)
-        #     size_hint_x: 0.5
+
 
 
 
@@ -41,7 +44,10 @@ kv_string = ('''
     BoxLayout:
         orientation: 'horizontal'
         size_hint_y: 0.1
-
+        Button:
+            text: "Compute Solution"
+            on_press: root.handle_solve(main_button.text)
+            size_hint_x: 0.5
         Button:
             id: main_button
             text: 'Click for Dropdown'
@@ -61,7 +67,7 @@ kv_string = ('''
                     dropdown.select(self.text)
                     dropdown.height = 0  # Collapse dropdown after selecting
             Button:
-                text: 'To be determined'
+                text: 'Determinant'
                 size_hint_y: None
                 height: 44
                 on_release: 
@@ -69,7 +75,7 @@ kv_string = ('''
                     dropdown.select(self.text)
                     dropdown.height = 0  # Collapse dropdown after selecting
             Button:
-                text: 'To be determined'
+                text: 'Eigenvalues/Eigenvectors'
                 size_hint_y: None
                 height: 44
                 on_release: 
@@ -99,24 +105,55 @@ kv_string = ('''
 Builder.load_string(kv_string)
 
 class CameraApp(BoxLayout):
+    
+    def __init__(self, **kwargs):
+        super(CameraApp, self).__init__(**kwargs)
+        self.took_image = False
+        self.extracted_matrix = False
+
     def toggle_camera(self):
         if platform == 'android':
             def android_callback(permissions, status):
                 if all(status):
-                    self.camera_toggle()
-                    print('passed permission checks')
+                    self._camera_toggle_logic()
             request_permissions([Permission.CAMERA, Permission.WRITE_EXTERNAL_STORAGE, Permission.INTERNET, Permission.RECORD_AUDIO], android_callback)
         else:
-            self.camera_toggle()
+            self._camera_toggle_logic()
 
-    def camera_toggle(self):
-        if self.ids.camera.play:
-            self.ids.camera.connect_camera(data_format="rgba", enable_video=False)
-            self.ids.camera.play = False
-        else:
+    def _camera_toggle_logic(self):
+        if not self.ids.camera.play:  # If the camera is on
+            self.ids.camera.play = True  # Turn it off
             self.ids.camera.disconnect_camera()
-            self.ids.camera.play = True
-    
+        else:
+            # If an image was previously captured, remove it
+            if self.took_image:
+                self.ids.camera.remove_widget(self.captured_img)
+                self.took_image = False
+
+            if self.extracted_matrix:
+                
+                self.ids.camera.remove_widget(self.grid_layout)
+                self.extracted_matrix = False
+
+
+            self.ids.camera.play = False  
+            # self.ids.camera.clear_widgets()
+            self.ids.camera.connect_camera(data_format="rgba", enable_video=False)
+
+    def capture_image(self):
+        self.took_image = True
+        
+        self.image = self.ids.camera.export_as_image()
+        self.image.texture.flip_vertical()
+
+        self.ids.camera.play = True
+        self.ids.camera.disconnect_camera()
+
+        self.captured_img = Image(texture=self.image.texture, size=self.ids.camera.size, pos=self.ids.camera.pos)
+        self.ids.camera.add_widget(self.captured_img)
+
+
+
 
     def sort_bboxes(self, bboxes):
     # Calculate the center y-coordinate of each bounding box
@@ -184,13 +221,11 @@ class CameraApp(BoxLayout):
         for row in rows:
             new_rows.append([i[-1] for i in row])
         rows = new_rows
-        print(f"Rows {new_rows}")
         cols = group_by_columns(bboxes)
         new_cols = []
         for col in cols:
             new_cols.append([i[-1] for i in col])
         cols = new_cols
-        print(f"Columns {cols}")
 
         def merge_matrices(rows_matrix, cols_matrix):
             # Calculate dimensions
@@ -236,25 +271,23 @@ class CameraApp(BoxLayout):
         img_threshold = cv2.adaptiveThreshold(
             img_blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
         )
+        cv2.imwrite("threshed.png", img_threshold)
         thresh = cv2.bitwise_not(img_threshold)
         binary_bgr_image = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+
         return binary_bgr_image
 
     def solve(self):
-        # self.model = YOLO("best_float32.tflite")
+        self.extracted_matrix = True
         new_image =  self.kivy_to_opencv(self.image)
-        new_image = cv2.flip(new_image, -1)  #
-        
-        new_image = cv2.flip(new_image, 0)
         is_success, image_buf = cv2.imencode(".jpg", new_image)
         if not is_success:
             print("Failed to encode image")
             return
-
-        # Use the requests library to send the image
+        
         files = {'file': ("image2.jpg", image_buf.tobytes(), 'image/jpg')}
-        try:
-            API_ENDPOINT = "http://127.0.0.1:8000/predict/"
+        try:                
+            API_ENDPOINT = "http://172.18.48.188:8000/predict/"
             response = requests.post(API_ENDPOINT, files=files)
             if response.status_code == 200:
                 print(response.json())
@@ -265,18 +298,16 @@ class CameraApp(BoxLayout):
         except Exception as e:
             print(f"Exception occurred: {str(e)}")
 
-
-
-
-
-        self.ids.camera.clear_widgets()
+        # self.ids.camera.clear_widgets()
+        self.ids.camera.remove_widget(self.image)
         self.grid_layout = GridLayout(cols=len(matrix[0]), size_hint=(0.5, 0.5))
 
         for i in range(len(matrix)):
             for j in range(len(matrix[i])):
                 self.grid_layout.add_widget(TextInput(text=str(matrix[i][j]), size_hint=(0.5, 0.5)))
-
         self.ids.camera.add_widget(self.grid_layout)
+
+
 
     def get_matrix_from_input(self, grid_layout):
         """Get the matrix values from the grid of TextInput widgets."""
@@ -293,32 +324,37 @@ class CameraApp(BoxLayout):
         return matrix
     
 
-    # def reduced_row_echelon_form(self, matrix):
-    #     m = sympy.Matrix(matrix)
-    #     return m.rref()
 
 
-    # def handle_solve(self, option):
-    #     abbrev = ''.join([word[0] for word in option.split()]).lower()
+    def handle_solve(self, option):
+        matrix = self.get_matrix_from_input(self.grid_layout)
+        self.solver = Solver(matrix)
+        if (option == "Reduced Row Echelon Form"):
+            # matrix = self.reduced_row_echelon_form(matrix).tolist()
+            matrix = self.solver.reduced_row_echelon_form().tolist()
+            self.grid_layout.clear_widgets()
+            for i in range(len(matrix)):
 
-    #     if (abbrev == "rref"):
-    #         matrix = self.get_matrix_from_input(self.grid_layout)
-    #         matrix = self.reduced_row_echelon_form(matrix)[0].tolist()
-    #         self.grid_layout.clear_widgets()
-    #         for i in range(len(matrix)):
-    #             for j in range(len(matrix[i])):
-    #                 answer = round(matrix[i][j])
-    #                 self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
+                for j in range(len(matrix[i])):
+                    answer = round(matrix[i][j], 5)
+                    self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
+        elif (option == "Determinant"):
+            determinant = self.solver.determinant()
+            self.grid_layout.clear_widgets()
+            self.grid_layout.add_widget(Label(text=str(determinant)))
+        elif (option == "Eigenvalues/Eigenvectors"):
+            values, vectors = self.solver.eig()
+            self.grid_layout.clear_widgets()
+            for i in range(len(vectors)):
+                for j in range(len(vectors[i])):
+                    answer = round(vectors[i][j], 5)
+                    self.grid_layout.add_widget(TextInput(text=str(answer), size_hint=(0.5, 0.5)))
+            self.grid_layout.add_widget(Label(text=str(values)))
+        
 
 
-    def capture_image(self):
-        # Capture the image from the camera
-        self.image = self.ids.camera.export_as_image()
-        self.image.texture.flip_vertical()
-        self.image.texture.flip_horizontal()
-        self.ids.camera.disconnect_camera()
-        self.ids.camera.clear_widgets()
-        self.ids.camera.add_widget(Image(texture=self.image.texture))
+
+
     
 
 
